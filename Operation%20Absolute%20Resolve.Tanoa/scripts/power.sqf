@@ -1,8 +1,20 @@
-// scripts\power.sqf
+//==============================================================================
+// scripts/power.sqf
+//==============================================================================
+// Server-side power management system for Phase 1
+// - Collects all light objects across Tanoa island
+// - Monitors tanoukaPowerOn variable
+// - Switches lights ON/OFF based on power state
+//
+// Called from: initServer.sqf
+// Runs on: Server only
+//==============================================================================
+
 if (!isServer) exitWith {};
 
 diag_log "[POWER] Collecting island lights...";
 
+// Scan entire map for light objects
 private _center = [worldSize / 2, worldSize / 2, 0];
 private _radius = worldSize * 0.9;
 
@@ -21,11 +33,11 @@ private _lamps = [];
   _lamps append (nearestObjects [_center, [_x], _radius]);
 } forEach _lampClasses;
 
-_lamps = _lamps arrayIntersect _lamps;  // de-dupe
+_lamps = _lamps arrayIntersect _lamps;  // Remove duplicates
 
 diag_log format ["[POWER] %1 light objects found", count _lamps];
 
-// Enforce power state
+// Monitor and enforce power state every 10 seconds
 while {true} do {
   if (missionNamespace getVariable ["tanoukaPowerOn", true]) then {
     { _x switchLight "ON"; } forEach _lamps;

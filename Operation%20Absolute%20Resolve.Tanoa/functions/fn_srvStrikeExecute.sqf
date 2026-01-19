@@ -1,3 +1,18 @@
+//==============================================================================
+// functions/fn_srvStrikeExecute.sqf
+//==============================================================================
+// Server function: Executes a strike at the specified position
+// - AIR: 8x Mk82 bombs over 80m radius
+// - NAVAL: 16x 155mm shells over 120m radius
+//
+// Parameters:
+//   _type - STRING: Strike type ("AIR" or "NAVAL")
+//   _pos - ARRAY: Target position [x,y,z]
+//
+// Called from: strikeScheduler.sqf
+// Runs on: Server only
+//==============================================================================
+
 if (!isServer) exitWith {};
 params ["_type", "_pos"];
 
@@ -12,11 +27,11 @@ private _doExplosions = {
 
 switch (_type) do {
   case "AIR": {
-    // Bigger, fewer
+    // Bigger bombs, fewer impacts, tighter spread
     ["Bo_Mk82", 8, 80, 0.45] call _doExplosions;
   };
   case "NAVAL": {
-    // More shells, wider
+    // More shells, wider spread, faster rate
     ["Sh_155mm_AMOS", 16, 120, 0.25] call _doExplosions;
   };
 };

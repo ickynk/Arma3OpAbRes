@@ -1,43 +1,69 @@
-// scripts\heliAssault\beginAssault.sqf
+//==============================================================================
+// scripts/heliAssault/beginAssault.sqf
+//==============================================================================
+// Phase 3 helicopter assault sequence
+// - Launches AI CAS (Close Air Support) helicopters with SAD waypoints
+// - Plays back pre-recorded tracks for assault helicopters
+// - Triggers ACE fast-rope when helicopters reach LZ
+//
+// Required Eden objects (variable names):
+//   - heli_assault_2, heli_assault_3, heli_player_1 (assault helicopters)
+//   - heli_cas_1, heli_cas_2 (optional CAS helicopters)
+//
+// Required markers:
+//   - mrk_lz (Landing Zone center point)
+//
+// Required variables:
+//   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
+//
+// Called from: fnc_srvBeginCarrierAssault (initServer.sqf)
+// Runs on: Server only
+//==============================================================================
+
 if (!isServer) exitWith {};
 
-// -------------------- CONFIG --------------------
-// Pull vehicles by Eden variable name safely (prevents nil -> driver error)
+//------------------------------------------------------------------------------
+// Configuration
+//------------------------------------------------------------------------------
+// Pull vehicle references from Eden (safe, returns objNull if missing)
 private _heliAssault2 = missionNamespace getVariable ["heli_assault_2", objNull];
 private _heliAssault3 = missionNamespace getVariable ["heli_assault_3", objNull];
 private _heliPlayer1  = missionNamespace getVariable ["heli_player_1",  objNull];
 
-// Assault helos that will PLAYBACK recorded tracks:
+// Assault helicopters (will playback recorded tracks)
 private _assaultHelis = [_heliAssault2, _heliAssault3, _heliPlayer1];
 
-// Matching track variables (same order)
+// Load matching recorded tracks (same order as helicopters)
 private _assaultTracks = [
   missionNamespace getVariable ["TRACK_ASSAULT_2", []],
   missionNamespace getVariable ["TRACK_ASSAULT_3", []],
   missionNamespace getVariable ["TRACK_PLAYER_1",  []]
 ];
 
-// Optional CAS helos (AI-controlled, NOT recorded)
+// Optional CAS helicopters (AI-controlled, NOT on recorded tracks)
 private _casHelis = [];
 private _heliCas1 = missionNamespace getVariable ["heli_cas_1", objNull];
 private _heliCas2 = missionNamespace getVariable ["heli_cas_2", objNull];
 if (!isNull _heliCas1) then { _casHelis pushBack _heliCas1; };
 if (!isNull _heliCas2) then { _casHelis pushBack _heliCas2; };
 
-// LZ marker
+// Landing zone
 private _lzCenter = getMarkerPos "mrk_lz";
 
-// Rope settings
-private _ropeTriggerRadius = 45;   // meters from LZ to trigger fast rope
-private _ropeStagger       = 8;    // seconds between each assault helo roping
-// ------------------------------------------------
+// Fast-rope configuration
+private _ropeTriggerRadius = 45;         // Distance from LZ to start fast-rope (meters)
+private _ropeStagger       = 8;          // Delay between each helicopter roping (seconds)
 
-// Basic sanity logging
+//------------------------------------------------------------------------------
+// Diagnostic logging
+//------------------------------------------------------------------------------
 diag_log format ["[ASSAULT] beginAssault started. Assault2=%1 Assault3=%2 PlayerHelo=%3 CAS1=%4 CAS2=%5",
   _heliAssault2, _heliAssault3, _heliPlayer1, _heliCas1, _heliCas2
 ];
 
-// --- Helper: wake aircraft that was cold on deck (fuel 0, damage off, etc.)
+//------------------------------------------------------------------------------
+// Helper function: Wake aircraft for flight
+//------------------------------------------------------------------------------
 private _wakeForPlayback = {
   params ["_veh"];
   if (isNull _veh) exitWith {};
@@ -70,7 +96,9 @@ private _wakeForPlayback = {
 };
 
 
-// --- 1) Start CAS AI (optional, not recorded)
+//------------------------------------------------------------------------------
+// Phase 1: Launch CAS helicopters (optional, AI-controlled)
+//------------------------------------------------------------------------------
 {
   private _veh = _x;
   if (isNull _veh) then { continue; };

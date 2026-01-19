@@ -1,3 +1,21 @@
+//==============================================================================
+// functions/fn_srvStrikePlan.sqf
+//==============================================================================
+// Server function: Manages strike package planning and finalization
+// - ADD: Adds a strike point to the plan (validates budget)
+// - REMOVE_LAST: Removes the most recent strike point (refunds cost)
+// - FINALIZE: Locks in the strike plan and starts Phase 3
+//
+// Parameters:
+//   _mode - STRING: Operation mode ("ADD", "REMOVE_LAST", or "FINALIZE")
+//   _type - STRING: Strike type ("AIR" or "NAVAL") - only for ADD mode
+//   _pos - ARRAY: Position [x,y,z] - only for ADD mode
+//   _cost - NUMBER: Point cost - only for ADD mode
+//
+// Called from: fn_strikeUI.sqf, player action menu
+// Runs on: Server only
+//==============================================================================
+
 if (!isServer) exitWith {};
 params ["_mode", "_type", "_pos", "_cost"];
 
@@ -43,9 +61,6 @@ switch (_mode) do {
       ["Add at least one strike point before finalizing."] remoteExec ["hint", 0];
     };
 
-    // OPTIONAL RULE: require at least one point near each major target area
-    // If you want this, place markers: mrk_port, mrk_airport, mrk_base and enforce distances here.
-
     strikeFinalized = true;
     ["Strike package FINALIZED. Random strikes will begin shortly and continue for the remainder of the mission."] remoteExec ["hint", 0];
     call _broadcastStatus;
@@ -54,10 +69,10 @@ switch (_mode) do {
     ["tsk_strikes", "SUCCEEDED"] call BIS_fnc_taskSetState;
     ["tsk_arrest", "ASSIGNED"] call BIS_fnc_taskSetState;
 
-    // Start scheduler loop
+    // Start strike scheduler loop
     [] execVM "scripts\strikeScheduler.sqf";
 
-    // Advance phase + role swap
+    // Advance to Phase 3 + force respawn for role swap
     [3] call fnc_phaseAdvance;
   };
 };

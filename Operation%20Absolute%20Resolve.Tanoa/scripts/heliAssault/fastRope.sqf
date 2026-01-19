@@ -1,4 +1,20 @@
-// scripts\heliAssault\fastRope.sqf
+//==============================================================================
+// scripts/heliAssault/fastRope.sqf
+//==============================================================================
+// Helicopter fast-rope insertion script
+// - Flies helicopter to designated slot position
+// - Clamps altitude at 30m AGL for stable hover
+// - Deploys ACE fast-rope (or fallback: eject cargo)
+//
+// Parameters:
+//   _heli - OBJECT: Helicopter to rope from
+//   _slotPos - ARRAY: Target hover position [x,y,z]
+//
+// Called from: beginAssault.sqf (spawned for each assault heli)
+// Runs on: Server only
+// Requires: ACE3 Fast Roping (optional, has fallback)
+//==============================================================================
+
 if (!isServer) exitWith {};
 params ["_heli", "_slotPos"];
 
@@ -6,14 +22,17 @@ if (isNull _heli || !alive _heli) exitWith {};
 
 private _grp = group (driver _heli);
 
-// --- CONFIG
-private _ropeAGL = 30;          // FORCE this altitude above ground
-private _approachRadius = 45;   // start clamping when within this distance
-private _clampSeconds = 6;      // how long to clamp altitude before roping
-private _speedCap = 22;         // keep it slow and stable
-// ------------
+//------------------------------------------------------------------------------
+// Configuration
+//------------------------------------------------------------------------------
+private _ropeAGL = 30;                   // Altitude above ground for fast-rope
+private _approachRadius = 45;            // Distance to start altitude clamp
+private _clampSeconds = 6;               // Duration to maintain hover before rope
+private _speedCap = 22;                  // Speed limit for stable approach
 
-// Clear WPs and move to slot
+//------------------------------------------------------------------------------
+// Approach phase
+//------------------------------------------------------------------------------
 [_grp] call fnc_clearWaypoints;
 
 _heli flyInHeight _ropeAGL;
@@ -24,7 +43,7 @@ _wp setWaypointType "MOVE";
 _wp setWaypointSpeed "LIMITED";
 _wp setWaypointCompletionRadius 15;
 
-// Wait until near slot (or timeout)
+// Wait until near slot (or timeout after 2 minutes)
 private _t0 = time;
 waitUntil {
   sleep 0.5;
@@ -34,44 +53,46 @@ waitUntil {
 };
 if (!alive _heli) exitWith {};
 
-// --- HARD CLAMP ALTITUDE TO 30m AGL ---
-// We do this briefly to overcome AI refusing flyInHeight.
+//------------------------------------------------------------------------------
+// Altitude clamp phase (stabilizes helicopter for rope deployment)
+//------------------------------------------------------------------------------
 private _tClamp = time + _clampSeconds;
 
 while {alive _heli && time < _tClamp} do {
-  // Keep XY near the slot (prevents drift while clamping)
+  // Lock position at slot coordinates, 30m AGL
   private _x = _slotPos select 0;
   private _y = _slotPos select 1;
 
-  // setPosATL uses AGL for Z (perfect for "30m above ground")
   _heli setPosATL [_x, _y, _ropeAGL];
 
-  // Remove vertical bob / momentum that can fight the clamp
+  // Remove vertical momentum to prevent bobbing
   _heli setVelocity [0, 0, 0];
   _heli limitSpeed _speedCap;
 
   sleep 0.10;
 };
 
-// Give a tiny settle
+// Brief settle time
 sleep 0.5;
 
-// --- ACE FAST ROPE ---
+//------------------------------------------------------------------------------
+// Fast-rope deployment (ACE3)
+//------------------------------------------------------------------------------
 private _didRope = false;
 
-// Equip ropes / FRIES if your ACE build supports it
+// Equip FRIES (Fast Rope Insertion Extraction System)
 if (!isNil "ace_fastroping_fnc_equipFRIES") then {
   [_heli] call ace_fastroping_fnc_equipFRIES;
   sleep 0.5;
 };
 
-// Trigger fast rope if available
+// Deploy fast-rope
 if (!isNil "ace_fastroping_fnc_fastRope") then {
   [_heli] call ace_fastroping_fnc_fastRope;
   _didRope = true;
 };
 
-// Fallback if ACE function not present
+// Fallback: Basic cargo eject if ACE not available
 if (!_didRope) then {
   {
     unassignVehicle _x;

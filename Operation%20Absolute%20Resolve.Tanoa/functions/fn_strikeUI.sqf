@@ -1,3 +1,19 @@
+//==============================================================================
+// functions/fn_strikeUI.sqf
+//==============================================================================
+// Client function: Opens map for player to select a strike target location
+// - Validates strike is allowed (Phase 2, not finalized)
+// - Shows remaining budget
+// - Sends selected position to server for processing
+//
+// Parameters:
+//   _type - STRING: Strike type ("AIR" or "NAVAL")
+//   _cost - NUMBER: Point cost of this strike type
+//
+// Called from: Player action menu (initPlayerLocal.sqf)
+// Runs on: Client with interface
+//==============================================================================
+
 params ["_type", "_cost"];
 if (!hasInterface) exitWith {};
 if (missionPhase != 2) exitWith { hint "Strike planning not active."; };

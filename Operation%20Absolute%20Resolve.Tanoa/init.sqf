@@ -1,3 +1,13 @@
+//==============================================================================
+// init.sqf
+//==============================================================================
+// Main initialization file - runs on ALL machines (server, client, headless)
+// Compiles all global functions used throughout the mission
+//==============================================================================
+
+//------------------------------------------------------------------------------
+// Compile global functions
+//------------------------------------------------------------------------------
 fnc_common            = compileFinal preprocessFileLineNumbers "functions\fn_common.sqf";
 fnc_phaseAdvance      = compileFinal preprocessFileLineNumbers "functions\fn_phaseAdvance.sqf";
 

@@ -1,0 +1,130 @@
+// scripts\heliAssault\beginAssault.sqf
+if (!isServer) exitWith {};
+
+// -------------------- CONFIG --------------------
+private _assaultHelis = [
+  heli_player_1,
+  heli_assault_2,
+  heli_assault_3
+  // add more if needed
+];
+
+// Optional CAS escort
+private _casHelis = [heli_cas_1, heli_cas_2];
+if (!isNil "heli_cas_1" && {!isNull heli_cas_1}) then { _casHelis pushBack heli_cas_1; };
+
+// Markers
+private _lzCenter = getMarkerPos "mrk_lz";
+
+// Slot spacing (increase if still too tight)
+private _slotSpacing = 110;
+
+// Build unique LZ slot positions
+private _slots = [_lzCenter, count _assaultHelis, _slotSpacing] call fnc_getLZSlots;
+
+// Orientation (optional)
+private _lzFacing = getMarkerPos "mrk_lz_facing";
+private _dirToLZ = if (_lzFacing isEqualTo [0,0,0]) then {0} else {_lzCenter getDir _lzFacing};
+
+// Enroute flight profile
+private _enrouteHeightBase = 90;
+private _enrouteHeightStep = 20;   // vertical separation between helos
+private _assaultSpeedCap   = 120;   // lower reduces bunching
+private _takeoffStagger    = 4;    // seconds
+
+// Rope sequencing
+private _ropeDelaySeconds  = 10;   // seconds between helos roping
+// ------------------------------------------------
+
+
+// Wake + launch assault helos with stagger and unique waypoints
+{
+  private _heli = _x;
+  private _slotPos = _slots select _forEachIndex;
+  private _delay = _forEachIndex * _takeoffStagger;
+  private _idx = _forEachIndex;
+
+  [_heli, _slotPos, _delay, _idx, _dirToLZ, _enrouteHeightBase, _enrouteHeightStep, _assaultSpeedCap] spawn {
+    params ["_heli","_slotPos","_delay","_idx","_dirToLZ","_enrouteHeightBase","_enrouteHeightStep","_assaultSpeedCap"];
+    sleep _delay;
+
+    if (isNull _heli) exitWith {};
+
+    // Wake and set basic flight behavior
+    [_heli, (_enrouteHeightBase + (_idx * _enrouteHeightStep))] call fnc_wakeAircraft;
+
+    if (_dirToLZ != 0) then { _heli setDir _dirToLZ; };
+    _heli limitSpeed _assaultSpeedCap;
+
+    private _grp = group (driver _heli);
+    [_grp] call fnc_clearWaypoints;
+
+    _grp setFormation "WEDGE";
+    _grp setBehaviourStrong "AWARE";
+    _grp setCombatMode "YELLOW";
+    _grp setSpeedMode "FULL";
+
+    // Move to unique LZ slot
+    private _wp = _grp addWaypoint [_slotPos, 0];
+    _wp setWaypointType "MOVE";
+    _wp setWaypointCompletionRadius 120;
+    _wp setWaypointSpeed "FULL";
+  };
+} forEach _assaultHelis;
+
+
+// Wake + launch CAS helos, orbit/SAD near LZ
+{
+  private _heli = _x;
+  [_heli, 140] call fnc_wakeAircraft;
+
+  if (_dirToLZ != 0) then { _heli setDir _dirToLZ; };
+  _heli limitSpeed 120;
+
+  private _grp = group (driver _heli);
+  [_grp] call fnc_clearWaypoints;
+
+  _grp setBehaviourStrong "AWARE";
+  _grp setCombatMode "RED";
+  _grp setSpeedMode "FULL";
+
+  private _wp = _grp addWaypoint [_lzCenter, 0];
+  _wp setWaypointType "SAD";
+  _wp setWaypointCompletionRadius 800;
+
+  private _cycle = _grp addWaypoint [_lzCenter, 0];
+  _cycle setWaypointType "CYCLE";
+} forEach _casHelis;
+
+
+// FAST ROPE CONTROLLER (param-passed so no missing symbol/function confusion)
+[_assaultHelis, _slots, _ropeDelaySeconds] spawn {
+  params ["_assaultHelis", "_slots", "_ropeDelaySeconds"];
+
+  // Give them time to get off the deck and stabilize enroute
+  sleep 12;
+
+  {
+    private _heli = _x;
+    private _slot = _slots select _forEachIndex;
+
+    if (isNull _heli || !alive _heli) then { continue; };
+
+    // Wait until the helo is close enough to begin rope approach
+    waitUntil {
+      sleep 1;
+      !alive _heli || ((_heli distance2D _slot) < 260)
+    };
+    if (!alive _heli) then { continue; };
+
+    // Prevent double-roping
+    if (_heli getVariable ["didFastRope", false]) then { continue; };
+
+    // Execute rope at that slot (drops to ~38m AGL inside fastRope.sqf)
+    [_heli, _slot] execVM "scripts\heliAssault\fastRope.sqf";
+    _heli setVariable ["didFastRope", true, true];
+
+    // Space out rope events so helos don't all hover-drop at once
+    sleep _ropeDelaySeconds;
+  } forEach _assaultHelis;
+};

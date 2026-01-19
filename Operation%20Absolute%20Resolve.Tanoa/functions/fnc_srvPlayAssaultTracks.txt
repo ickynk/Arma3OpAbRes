@@ -1,0 +1,18 @@
+fnc_srvPlayAssaultTracks = {
+  if (!isServer) exitWith {};
+
+  // Prevent pilot AI from fighting the playback
+  {
+    if (!isNull _x) then {
+      { (driver _x) disableAI _y; } forEach ["MOVE","PATH","FSM","TARGET","AUTOTARGET"];
+      _x engineOn true;
+      _x allowDamage false;   // optional for cinematic safety
+    };
+  } forEach [heli_assault_2, heli_assault_3, heli_player_1];
+
+  // Play recorded paths
+  [heli_assault_2, TRACK_ASSAULT_2] spawn BIS_fnc_unitPlay;
+  [heli_assault_3, TRACK_ASSAULT_3] spawn BIS_fnc_unitPlay;
+  [heli_player_1, TRACK_PLAYER_1]   spawn BIS_fnc_unitPlay;
+};
+publicVariable "fnc_srvPlayAssaultTracks";

@@ -1,0 +1,16 @@
+respawn = 3;
+respawnDelay = 3;
+respawnOnStart = 0;
+respawnTemplates[] = {"MenuPosition"};  // lets players pick spawn position when forced to respawn
+disabledAI = 1;
+
+class Params
+{
+  class AllowJIP
+  {
+    title = "Allow Join-in-Progress";
+    values[] = {0,1};
+    texts[] = {"No","Yes"};
+    default = 1;
+  };
+};

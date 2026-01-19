@@ -1,33 +1,13 @@
-if (!isServer) exitWith {};
+//==============================================================================
+// scripts/strikes.sqf
+//==============================================================================
+// NOTE: This file is currently unused. Strike functionality is handled by:
+//   - fn_strikeUI.sqf (client UI for map clicks)
+//   - fn_srvStrikePlan.sqf (server-side strike planning)
+//   - fn_srvStrikeExecute.sqf (server-side strike execution)
+//   - strikeScheduler.sqf (randomized strike scheduling)
+//
+// This file can be deleted if no custom strike functionality is needed.
+//==============================================================================
 
-strikeTargets = [
-  ["tgt_port",   false],
-  ["tgt_airport",false],
-  ["tgt_base1",  false]
-];
-publicVariable "strikeTargets";
-
-fnc_doStrike = {
-  params ["_pos", "_type"];
-
-  // Example types: "BOMB", "NAVAL"
-  switch (_type) do {
-    case "BOMB": {
-      // Spawn a few explosions
-      for "_i" from 1 to 6 do {
-        private _p = _pos getPos [random 35, random 360];
-        "Bo_Mk82" createVehicle _p;
-        sleep 0.4;
-      };
-    };
-    case "NAVAL": {
-      for "_i" from 1 to 10 do {
-        private _p = _pos getPos [random 60, random 360];
-        "Sh_155mm_AMOS" createVehicle _p;
-        sleep 0.25;
-      };
-    };
-  };
-};
-
-publicVariable "fnc_doStrike";
+// Placeholder for future custom strike types or behaviors

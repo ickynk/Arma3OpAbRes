@@ -1,24 +1,46 @@
-missionPhase = 1; publicVariable "missionPhase";
-tanoukaPowerOn = true; publicVariable "tanoukaPowerOn";
+//==============================================================================
+// initServer.sqf
+//==============================================================================
+// Server initialization - runs only on the server machine
+// Sets up global variables, tasks, and server-side systems
+//==============================================================================
 
-strikeBudgetMax = 10;
-strikeBudgetUsed = 0;
-strikeFinalized = false;
+//------------------------------------------------------------------------------
+// Mission phase tracking
+//------------------------------------------------------------------------------
+missionPhase = 1;                        // Current phase: 1=Blackout, 2=Strikes, 3=Assault
+publicVariable "missionPhase";
 
-// Each entry: ["AIR"|"NAVAL", [x,y,z], cost]
+tanoukaPowerOn = true;                   // Island power state
+publicVariable "tanoukaPowerOn";
+
+//------------------------------------------------------------------------------
+// Strike system configuration
+//------------------------------------------------------------------------------
+strikeBudgetMax = 10;                    // Total points available for strike package
+strikeBudgetUsed = 0;                    // Points currently spent
+strikeFinalized = false;                 // Whether strike package is locked in
+
+// Strike plan array - each entry: ["AIR"|"NAVAL", [x,y,z], cost]
 strikePlan = [];
 
 publicVariable "strikeBudgetMax";
 publicVariable "strikeBudgetUsed";
 publicVariable "strikeFinalized";
 publicVariable "strikePlan";
+
+//------------------------------------------------------------------------------
+// Load helicopter recorded tracks (for Phase 3 assault)
+//------------------------------------------------------------------------------
 call compileFinal preprocessFileLineNumbers "scripts\heliAssault\tracks.sqf";
 publicVariable "TRACK_ASSAULT_2";
 publicVariable "TRACK_ASSAULT_3";
 publicVariable "TRACK_PLAYER_1";
 
 
-// Tasks
+//------------------------------------------------------------------------------
+// Create mission tasks (BIS task system)
+//------------------------------------------------------------------------------
 [
   west,
   "tsk_blackout",
@@ -49,38 +71,51 @@ publicVariable "TRACK_PLAYER_1";
   true
 ] call BIS_fnc_taskCreate;
 
-// Server functions
+//------------------------------------------------------------------------------
+// Publish server functions for remote execution
+//------------------------------------------------------------------------------
 publicVariable "fnc_srvStrikePlan";
 publicVariable "fnc_srvStrikeExecute";
 
-// Systems
-[] execVM "scripts\power.sqf";
-[] execVM "scripts\hvt.sqf";
+//------------------------------------------------------------------------------
+// Start server-side systems
+//------------------------------------------------------------------------------
+[] execVM "scripts\power.sqf";           // Island power management
+[] execVM "scripts\hvt.sqf";             // HVT setup and arrest handler
 
+//------------------------------------------------------------------------------
+// PHASE 1: Server function - Trip power (blackout)
+//------------------------------------------------------------------------------
 fnc_srvTripPower = {
   if (!isServer) exitWith {};
   if (missionPhase != 1) exitWith {};
 
-  tanoukaPowerOn = false; publicVariable "tanoukaPowerOn";
+  tanoukaPowerOn = false;
+  publicVariable "tanoukaPowerOn";
 
   ["tsk_blackout","SUCCEEDED"] call BIS_fnc_taskSetState;
   ["tsk_strikes","ASSIGNED"] call BIS_fnc_taskSetState;
 
-  // Move into Phase 2 + role swap (respawn)
+  // Advance to Phase 2 + force respawn for role swap
   [2] call fnc_phaseAdvance;
 };
 publicVariable "fnc_srvTripPower";
 
+//------------------------------------------------------------------------------
+// PHASE 3: Assault state tracking
+//------------------------------------------------------------------------------
 assaultBegun = false;
 publicVariable "assaultBegun";
 
-// Compile/Load helicopter assault utilities & functions
+// Load helicopter assault utilities
 call compileFinal preprocessFileLineNumbers "scripts\heliAssault\utils.sqf";
 
-// Server entry point: begin assault
+//------------------------------------------------------------------------------
+// PHASE 3: Server function - Begin carrier assault
+//------------------------------------------------------------------------------
 fnc_srvBeginCarrierAssault = {
   if (!isServer) exitWith {};
-  if (assaultBegun) exitWith {};
+  if (assaultBegun) exitWith {};                            // Prevent duplicate launches
   if ((missionNamespace getVariable ["missionPhase", 1]) != 3) exitWith {};
 
   assaultBegun = true;

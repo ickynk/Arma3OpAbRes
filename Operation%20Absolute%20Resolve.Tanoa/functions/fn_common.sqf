@@ -1,4 +1,13 @@
-// functions\fn_common.sqf
+//==============================================================================
+// functions/fn_common.sqf
+//==============================================================================
+// Client-side UI notification system
+// Monitors mission phase changes and displays hints to players
+//
+// Called from: initPlayerLocal.sqf
+// Runs on: Client with interface
+//==============================================================================
+
 if (!hasInterface) exitWith {};
 
 missionNamespace setVariable ["_lastPhase", -1];

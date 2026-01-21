@@ -16,6 +16,12 @@
 // Required variables:
 //   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
 //
+// AI Handling:
+//   Pilot AI is disabled during track playback to prevent interference.
+//   REQUIRED components: MOVE (movement AI), PATH (pathfinding)
+//   RECOMMENDED: FSM (behavior scripts), TARGET/AUTOTARGET (combat focus)
+//   AI is NOT re-enabled after playback - helicopters remain stationary at LZ.
+//
 // Called from: fnc_srvBeginCarrierAssault (initServer.sqf)
 // Runs on: Server only
 //==============================================================================
@@ -155,7 +161,11 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
     _i, local _veh, owner _veh
   ];
 
-  // Disable pilot AI where the vehicle is LOCAL (so it can't fight playback)
+  // Disable pilot AI to prevent interference with track playback
+  // - MOVE: Critical - prevents AI movement commands overriding playback
+  // - PATH: Critical - prevents pathfinding rerouting the recorded path
+  // - FSM: Important - prevents behavior scripts (RTB, land, etc.) from triggering
+  // - TARGET/AUTOTARGET: Prevents combat distractions during insertion
   // Use remoteExec with target=_veh (runs on machine that owns _veh locality)
   [_veh] remoteExec [
     {

@@ -13,8 +13,8 @@
 // Required markers:
 //   - mrk_lz (Landing Zone center point)
 //
-// Required variables:
-//   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
+// Required track files (scripts\heliAssault\tracks\):
+//   - track_assault_2.sqf, track_assault_3.sqf, track_player_1.sqf
 //
 // AI Handling:
 //   TARGET/AUTOTARGET disabled and waypoints cleared before track playback.
@@ -38,10 +38,13 @@ private _heliPlayer1  = missionNamespace getVariable ["heli_player_1",  objNull]
 // Assault helicopters (will playback recorded tracks)
 private _assaultHelis = [_heliAssault2, _heliAssault3, _heliPlayer1];
 
-// Matching track variable names (same order as helicopters)
-// Only the names are stored here - data is looked up locally on the target machine
-// to avoid serializing large arrays through remoteExec
-private _assaultTrackNames = ["TRACK_ASSAULT_2", "TRACK_ASSAULT_3", "TRACK_PLAYER_1"];
+// Matching track files (same order as helicopters)
+// Each file is execVM'd on the vehicle owner - track data stays on disk, no network serialization
+private _assaultTrackFiles = [
+  "scripts\heliAssault\tracks\track_assault_2.sqf",
+  "scripts\heliAssault\tracks\track_assault_3.sqf",
+  "scripts\heliAssault\tracks\track_player_1.sqf"
+];
 
 // Optional CAS helicopters (AI-controlled, NOT on recorded tracks)
 private _casHelis = [];
@@ -138,16 +141,15 @@ private _wakeForPlayback = {
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
   private _veh       = _assaultHelis select _i;
-  private _trackName = _assaultTrackNames select _i;
-  private _track     = missionNamespace getVariable [_trackName, []];
+  private _trackFile = _assaultTrackFiles select _i;
 
   if (isNull _veh) then {
     diag_log format ["[ASSAULT] ERROR: Assault helo index %1 is null. Check Eden variable name (heli_assault_2/3/player_1).", _i];
     continue;
   };
 
-  if ((count _track) == 0) then {
-    diag_log format ["[ASSAULT] ERROR: Track array missing/empty for index %1 (var: %2). Did you load tracks.sqf?", _i, _trackName];
+  if (_trackFile == "") then {
+    diag_log format ["[ASSAULT] ERROR: No track file for index %1. Check _assaultTrackFiles.", _i];
     continue;
   };
 
@@ -156,26 +158,21 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
   // Debug locality
   diag_log format ["[ASSAULT] Playback helo idx=%1 track=%2 localOnServer=%3 owner=%4",
-    _i, _trackName, local _veh, owner _veh
+    _i, _trackFile, local _veh, owner _veh
   ];
 
-  // Disable targeting AI and clear waypoints, then play track on vehicle owner's machine
-  // MOVE/PATH must remain enabled - unitPlay requires the AI movement system to update position
-  // Only the variable name is sent via remoteExec (not the huge array)
-  // Target machine looks up track data from its own namespace (via publicVariable)
-  [[_veh, _trackName], {
-    params ["_v", "_tName"];
+  // Disable targeting AI, clear waypoints, then execVM the track file on vehicle owner
+  // MOVE/PATH must remain enabled - unitPlay requires the AI movement system
+  // Track data stays on disk and is loaded locally via execVM - no network serialization
+  [[_veh, _trackFile], {
+    params ["_v", "_f"];
     private _p = driver _v;
     if (!isNull _p) then {
       { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
-      // Clear waypoints so AI has nothing to path to on its own
       private _grp = group _p;
       { deleteWaypoint _x } forEach waypoints _grp;
     };
-    private _t = missionNamespace getVariable [_tName, []];
-    if (count _t > 0) then {
-      [_v, _t] call BIS_fnc_unitPlay;
-    };
+    [_v] execVM _f;
   }] remoteExec ["BIS_fnc_call", _veh];
 };
 

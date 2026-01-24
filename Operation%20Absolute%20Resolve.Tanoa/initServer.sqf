@@ -30,15 +30,6 @@ publicVariable "strikeFinalized";
 publicVariable "strikePlan";
 
 //------------------------------------------------------------------------------
-// Load helicopter recorded tracks (for Phase 3 assault)
-//------------------------------------------------------------------------------
-call compileFinal preprocessFileLineNumbers "scripts\heliAssault\tracks.sqf";
-publicVariable "TRACK_ASSAULT_2";
-publicVariable "TRACK_ASSAULT_3";
-publicVariable "TRACK_PLAYER_1";
-
-
-//------------------------------------------------------------------------------
 // Create mission tasks (BIS task system)
 //------------------------------------------------------------------------------
 [

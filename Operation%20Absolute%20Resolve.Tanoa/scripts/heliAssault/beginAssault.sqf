@@ -38,12 +38,10 @@ private _heliPlayer1  = missionNamespace getVariable ["heli_player_1",  objNull]
 // Assault helicopters (will playback recorded tracks)
 private _assaultHelis = [_heliAssault2, _heliAssault3, _heliPlayer1];
 
-// Load matching recorded tracks (same order as helicopters)
-private _assaultTracks = [
-  missionNamespace getVariable ["TRACK_ASSAULT_2", []],
-  missionNamespace getVariable ["TRACK_ASSAULT_3", []],
-  missionNamespace getVariable ["TRACK_PLAYER_1",  []]
-];
+// Matching track variable names (same order as helicopters)
+// Only the names are stored here - data is looked up locally on the target machine
+// to avoid serializing large arrays through remoteExec
+private _assaultTrackNames = ["TRACK_ASSAULT_2", "TRACK_ASSAULT_3", "TRACK_PLAYER_1"];
 
 // Optional CAS helicopters (AI-controlled, NOT on recorded tracks)
 private _casHelis = [];
@@ -139,8 +137,9 @@ private _wakeForPlayback = {
 // --- 2) Start assault helo playback tracks (LOCALITY-SAFE via remoteExec to vehicle owner)
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
-  private _veh   = _assaultHelis select _i;
-  private _track = _assaultTracks select _i;
+  private _veh       = _assaultHelis select _i;
+  private _trackName = _assaultTrackNames select _i;
+  private _track     = missionNamespace getVariable [_trackName, []];
 
   if (isNull _veh) then {
     diag_log format ["[ASSAULT] ERROR: Assault helo index %1 is null. Check Eden variable name (heli_assault_2/3/player_1).", _i];
@@ -148,7 +147,7 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   };
 
   if ((count _track) == 0) then {
-    diag_log format ["[ASSAULT] ERROR: Track array missing/empty for assault index %1. Did you load TRACK_ASSAULT_2/3/PLAYER_1?", _i];
+    diag_log format ["[ASSAULT] ERROR: Track array missing/empty for index %1 (var: %2). Did you load tracks.sqf?", _i, _trackName];
     continue;
   };
 
@@ -156,22 +155,24 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   [_veh] call _wakeForPlayback;
 
   // Debug locality
-  diag_log format ["[ASSAULT] Playback helo idx=%1 localOnServer=%2 owner=%3",
-    _i, local _veh, owner _veh
+  diag_log format ["[ASSAULT] Playback helo idx=%1 track=%2 localOnServer=%3 owner=%4",
+    _i, _trackName, local _veh, owner _veh
   ];
 
-  // Disable pilot AI to prevent interference with track playback
-  // Runs on machine that owns _veh locality via BIS_fnc_call
-  [[_veh], {
-    params ["_v"];
+  // Disable AI and play track on vehicle owner's machine
+  // Only the variable name is sent via remoteExec (not the huge array)
+  // Target machine looks up track data from its own namespace (via publicVariable)
+  [[_veh, _trackName], {
+    params ["_v", "_tName"];
     private _p = driver _v;
     if (!isNull _p) then {
       { _p disableAI _x } forEach ["MOVE","PATH","TARGET","AUTOTARGET"];
     };
+    private _t = missionNamespace getVariable [_tName, []];
+    if (count _t > 0) then {
+      [_v, _t] call BIS_fnc_unitPlay;
+    };
   }] remoteExec ["BIS_fnc_call", _veh];
-
-  // PLAY recorded path ON VEHICLE LOCALITY (critical for MP)
-  [_veh, _track] remoteExec ["BIS_fnc_unitPlay", _veh];
 };
 
 

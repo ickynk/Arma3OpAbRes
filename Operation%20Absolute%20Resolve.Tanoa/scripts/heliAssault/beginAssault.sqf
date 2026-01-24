@@ -17,8 +17,8 @@
 //   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
 //
 // AI Handling:
-//   MOVE/PATH/TARGET/AUTOTARGET disabled on pilots during track playback
-//   to prevent AI from fighting BIS_fnc_unitPlay position updates.
+//   TARGET/AUTOTARGET disabled and waypoints cleared before track playback.
+//   MOVE/PATH must remain enabled - unitPlay requires the AI movement system.
 //   AI is NOT re-enabled after playback - helicopters remain stationary at LZ.
 //
 // Called from: fnc_srvBeginCarrierAssault (initServer.sqf)
@@ -159,14 +159,18 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
     _i, _trackName, local _veh, owner _veh
   ];
 
-  // Disable AI and play track on vehicle owner's machine
+  // Disable targeting AI and clear waypoints, then play track on vehicle owner's machine
+  // MOVE/PATH must remain enabled - unitPlay requires the AI movement system to update position
   // Only the variable name is sent via remoteExec (not the huge array)
   // Target machine looks up track data from its own namespace (via publicVariable)
   [[_veh, _trackName], {
     params ["_v", "_tName"];
     private _p = driver _v;
     if (!isNull _p) then {
-      { _p disableAI _x } forEach ["MOVE","PATH","TARGET","AUTOTARGET"];
+      { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
+      // Clear waypoints so AI has nothing to path to on its own
+      private _grp = group _p;
+      { deleteWaypoint _x } forEach waypoints _grp;
     };
     private _t = missionNamespace getVariable [_tName, []];
     if (count _t > 0) then {

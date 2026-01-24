@@ -138,6 +138,19 @@ private _wakeForPlayback = {
 
 
 // --- 2) Start assault helo playback tracks (LOCALITY-SAFE via remoteExec to vehicle owner)
+
+// Named function for track playback - avoids code block serialization issues with remoteExec
+fnc_playAssaultTrack = {
+  params ["_v", "_f"];
+  private _p = driver _v;
+  if (!isNull _p) then {
+    { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
+    { deleteWaypoint _x } forEach waypoints (group _p);
+  };
+  [_v] execVM _f;
+};
+publicVariable "fnc_playAssaultTrack";
+
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
   private _veh       = _assaultHelis select _i;
@@ -161,26 +174,17 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
     _i, _trackFile, local _veh, owner _veh
   ];
 
-  // Disable targeting AI, clear waypoints, then execVM the track file on vehicle owner
   // MOVE/PATH must remain enabled - unitPlay requires the AI movement system
   // Track data stays on disk and is loaded locally via execVM - no network serialization
-  [[_veh, _trackFile], {
-    params ["_v", "_f"];
-    private _p = driver _v;
-    if (!isNull _p) then {
-      { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
-      private _grp = group _p;
-      { deleteWaypoint _x } forEach waypoints _grp;
-    };
-    [_v] execVM _f;
-  }] remoteExec ["BIS_fnc_call", _veh];
+  [_veh, _trackFile] remoteExec ["fnc_playAssaultTrack", _veh];
 };
 
 
 // --- 3) Fast rope trigger loop (distance-based)
 // IMPORTANT: this loop runs on SERVER; ACE fast-rope functions are usually fine server-side,
 // but if your modpack requires locality, we remoteExec them to the vehicle locality too.
-[] spawn {
+[_ropeTriggerRadius, _ropeStagger] spawn {
+  params ["_ropeTriggerRadius", "_ropeStagger"];
   sleep 2;
 
   private _lz = getMarkerPos "mrk_lz";

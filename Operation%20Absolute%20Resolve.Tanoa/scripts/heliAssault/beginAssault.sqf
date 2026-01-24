@@ -16,10 +16,9 @@
 // Required variables:
 //   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
 //
-// AI Handling (TEST CONFIG):
-//   Currently testing with MOVE/PATH/FSM ENABLED to see if they interfere.
-//   Only TARGET/AUTOTARGET are disabled to prevent combat distractions.
-//   If helicopters deviate from route, gradually disable: MOVE → PATH → FSM
+// AI Handling:
+//   MOVE/PATH/TARGET/AUTOTARGET disabled on pilots during track playback
+//   to prevent AI from fighting BIS_fnc_unitPlay position updates.
 //   AI is NOT re-enabled after playback - helicopters remain stationary at LZ.
 //
 // Called from: fnc_srvBeginCarrierAssault (initServer.sqf)
@@ -162,22 +161,14 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   ];
 
   // Disable pilot AI to prevent interference with track playback
-  // TEST CONFIG: Only disabling TARGET/AUTOTARGET to test if MOVE/PATH/FSM interfere
-  // - MOVE: ENABLED (testing if AI movement interferes)
-  // - PATH: ENABLED (testing if pathfinding interferes)
-  // - FSM: ENABLED (testing if behavior scripts interfere)
-  // - TARGET/AUTOTARGET: DISABLED (prevents combat distractions)
-  // Use remoteExec with target=_veh (runs on machine that owns _veh locality)
-  [_veh] remoteExec [
-    {
-      params ["_v"];
-      private _p = driver _v;
-      if (!isNull _p) then {
-        { _p disableAI _x; } forEach ["TARGET","AUTOTARGET"];
-      };
-    },
-    _veh
-  ];
+  // Runs on machine that owns _veh locality via BIS_fnc_call
+  [[_veh], {
+    params ["_v"];
+    private _p = driver _v;
+    if (!isNull _p) then {
+      { _p disableAI _x } forEach ["MOVE","PATH","TARGET","AUTOTARGET"];
+    };
+  }] remoteExec ["BIS_fnc_call", _veh];
 
   // PLAY recorded path ON VEHICLE LOCALITY (critical for MP)
   [_veh, _track] remoteExec ["BIS_fnc_unitPlay", _veh];

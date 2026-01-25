@@ -1,7 +1,7 @@
 // Disable targeting AI and clear waypoints
 private _veh = heli_assault_3;
 private _p = driver _veh;
-if (\!isNull _p) then {
+if (!isNull _p) then {
   { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
   { deleteWaypoint _x } forEach waypoints (group _p);
 };

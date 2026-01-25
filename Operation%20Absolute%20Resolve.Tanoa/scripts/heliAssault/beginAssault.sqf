@@ -138,18 +138,7 @@ private _wakeForPlayback = {
 
 
 // --- 2) Start assault helo playback tracks (LOCALITY-SAFE via remoteExec to vehicle owner)
-
-// Named function for track playback - avoids code block serialization issues with remoteExec
-fnc_playAssaultTrack = {
-  params ["_v", "_f"];
-  private _p = driver _v;
-  if (!isNull _p) then {
-    { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
-    { deleteWaypoint _x } forEach waypoints (group _p);
-  };
-  [_v] execVM _f;
-};
-publicVariable "fnc_playAssaultTrack";
+// Each track file handles its own AI disable, waypoint clearing, and BIS_fnc_unitPlay call
 
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
@@ -169,14 +158,12 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   // Wake up first (server-side changes replicate)
   [_veh] call _wakeForPlayback;
 
-  // Debug locality
   diag_log format ["[ASSAULT] Playback helo idx=%1 track=%2 localOnServer=%3 owner=%4",
     _i, _trackFile, local _veh, owner _veh
   ];
 
-  // MOVE/PATH must remain enabled - unitPlay requires the AI movement system
-  // Track data stays on disk and is loaded locally via execVM - no network serialization
-  [_veh, _trackFile] remoteExec ["fnc_playAssaultTrack", _veh];
+  // execVM track file on the machine that owns the vehicle
+  _trackFile remoteExec ["execVM", _veh];
 };
 
 

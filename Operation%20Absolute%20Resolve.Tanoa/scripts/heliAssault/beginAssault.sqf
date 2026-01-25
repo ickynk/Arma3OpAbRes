@@ -3,8 +3,8 @@
 //==============================================================================
 // Phase 3 helicopter assault sequence
 // - Launches AI CAS (Close Air Support) helicopters with SAD waypoints
-// - Plays back pre-recorded tracks for assault helicopters
-// - Triggers ACE fast-rope when helicopters reach LZ
+// - Flies assault helicopters to LZ using waypoints and lands them
+// - Troops disembark after landing
 //
 // Required Eden objects (variable names):
 //   - heli_assault_2, heli_assault_3, heli_player_1 (assault helicopters)
@@ -12,14 +12,6 @@
 //
 // Required markers:
 //   - mrk_lz (Landing Zone center point)
-//
-// Required variables:
-//   - TRACK_ASSAULT_2, TRACK_ASSAULT_3, TRACK_PLAYER_1 (recorded tracks)
-//
-// AI Handling:
-//   TARGET/AUTOTARGET disabled and waypoints cleared before track playback.
-//   MOVE/PATH must remain enabled - unitPlay requires the AI movement system.
-//   AI is NOT re-enabled after playback - helicopters remain stationary at LZ.
 //
 // Called from: fnc_srvBeginCarrierAssault (initServer.sqf)
 // Runs on: Server only
@@ -35,13 +27,16 @@ private _heliAssault2 = missionNamespace getVariable ["heli_assault_2", objNull]
 private _heliAssault3 = missionNamespace getVariable ["heli_assault_3", objNull];
 private _heliPlayer1  = missionNamespace getVariable ["heli_player_1",  objNull];
 
-// Assault helicopters (will playback recorded tracks)
+// Assault helicopters (will fly to LZ and land)
 private _assaultHelis = [_heliAssault2, _heliAssault3, _heliPlayer1];
 
-// Matching track variable names (same order as helicopters)
-// Only the names are stored here - data is looked up locally on the target machine
-// to avoid serializing large arrays through remoteExec
-private _assaultTrackNames = ["TRACK_ASSAULT_2", "TRACK_ASSAULT_3", "TRACK_PLAYER_1"];
+// Landing position offsets for each helicopter (relative to LZ center)
+// Spaced 50m apart in a line formation to prevent rotor collision
+private _landingOffsets = [
+  [0, 0],       // First helicopter lands at LZ center
+  [50, 0],      // Second helicopter lands 50m east
+  [-50, 0]      // Third helicopter lands 50m west
+];
 
 // Optional CAS helicopters (AI-controlled, NOT on recorded tracks)
 private _casHelis = [];
@@ -53,9 +48,9 @@ if (!isNull _heliCas2) then { _casHelis pushBack _heliCas2; };
 // Landing zone
 private _lzCenter = getMarkerPos "mrk_lz";
 
-// Fast-rope configuration
-private _ropeTriggerRadius = 45;         // Distance from LZ to start fast-rope (meters)
-private _ropeStagger       = 8;          // Delay between each helicopter roping (seconds)
+// Landing configuration
+private _approachHeight = 100;           // Altitude for approach to LZ (meters AGL)
+private _approachSpeed = 150;            // Speed limit during approach (km/h)
 
 //------------------------------------------------------------------------------
 // Diagnostic logging
@@ -134,90 +129,101 @@ private _wakeForPlayback = {
 } forEach _casHelis;
 
 
-// --- 2) Start assault helo playback tracks (LOCALITY-SAFE via remoteExec to vehicle owner)
+//------------------------------------------------------------------------------
+// Phase 2: Launch assault helicopters to LZ (waypoint-based landing)
+//------------------------------------------------------------------------------
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
 
-  private _veh       = _assaultHelis select _i;
-  private _trackName = _assaultTrackNames select _i;
-  private _track     = missionNamespace getVariable [_trackName, []];
+  private _veh = _assaultHelis select _i;
+  private _offset = _landingOffsets select _i;
 
   if (isNull _veh) then {
     diag_log format ["[ASSAULT] ERROR: Assault helo index %1 is null. Check Eden variable name (heli_assault_2/3/player_1).", _i];
     continue;
   };
 
-  if ((count _track) == 0) then {
-    diag_log format ["[ASSAULT] ERROR: Track array missing/empty for index %1 (var: %2). Did you load tracks.sqf?", _i, _trackName];
+  // Wake up the helicopter
+  [_veh] call _wakeForPlayback;
+
+  private _pilot = driver _veh;
+  if (isNull _pilot) then {
+    diag_log format ["[ASSAULT] WARNING: Assault helo %1 has no pilot/driver.", _veh];
     continue;
   };
 
-  // Wake up first (server-side changes replicate)
-  [_veh] call _wakeForPlayback;
+  private _grp = group _pilot;
 
-  // Debug locality
-  diag_log format ["[ASSAULT] Playback helo idx=%1 track=%2 localOnServer=%3 owner=%4",
-    _i, _trackName, local _veh, owner _veh
+  // Clear existing waypoints
+  { deleteWaypoint _x } forEach waypoints _grp;
+
+  // Calculate landing position with offset
+  private _landingPos = [
+    (_lzCenter select 0) + (_offset select 0),
+    (_lzCenter select 1) + (_offset select 1),
+    0
   ];
 
-  // Disable targeting AI and clear waypoints, then play track on vehicle owner's machine
-  // MOVE/PATH must remain enabled - unitPlay requires the AI movement system to update position
-  // Only the variable name is sent via remoteExec (not the huge array)
-  // Target machine looks up track data from its own namespace (via publicVariable)
-  [[_veh, _trackName], {
-    params ["_v", "_tName"];
-    private _p = driver _v;
-    if (!isNull _p) then {
-      { _p disableAI _x } forEach ["TARGET","AUTOTARGET"];
-      // Clear waypoints so AI has nothing to path to on its own
-      private _grp = group _p;
-      { deleteWaypoint _x } forEach waypoints _grp;
+  // Set flight parameters
+  _grp setBehaviourStrong "CARELESS";
+  _grp setCombatMode "BLUE";
+  _grp setSpeedMode "FULL";
+
+  _veh flyInHeight _approachHeight;
+  _veh limitSpeed _approachSpeed;
+
+  // Waypoint 1: MOVE to landing position
+  private _wp1 = _grp addWaypoint [_landingPos, 0];
+  _wp1 setWaypointType "MOVE";
+  _wp1 setWaypointSpeed "FULL";
+  _wp1 setWaypointCompletionRadius 50;
+
+  // Waypoint 2: TR UNLOAD (Transport Unload) - helicopter lands and troops disembark
+  private _wp2 = _grp addWaypoint [_landingPos, 0];
+  _wp2 setWaypointType "TR UNLOAD";
+  _wp2 setWaypointSpeed "LIMITED";
+  _wp2 setWaypointCompletionRadius 20;
+
+  // Waypoint 3: HOLD position after unload
+  private _wp3 = _grp addWaypoint [_landingPos, 0];
+  _wp3 setWaypointType "HOLD";
+
+  diag_log format ["[ASSAULT] Assault helo idx=%1 assigned landing at %2 (offset %3)",
+    _i, _landingPos, _offset
+  ];
+
+  // Spawn monitoring thread for this helicopter to handle landing and disembark
+  [_veh, _landingPos, _i] spawn {
+    params ["_heli", "_landPos", "_idx"];
+
+    // Wait until helicopter is close to landing position
+    waitUntil {
+      sleep 1;
+      !alive _heli || ((_heli distance2D _landPos) < 100)
     };
-    private _t = missionNamespace getVariable [_tName, []];
-    if (count _t > 0) then {
-      [_v, _t] call BIS_fnc_unitPlay;
-    };
-  }] remoteExec ["BIS_fnc_call", _veh];
-};
+    if (!alive _heli) exitWith {};
 
+    // Order helicopter to land
+    _heli land "LAND";
 
-// --- 3) Fast rope trigger loop (distance-based)
-// IMPORTANT: this loop runs on SERVER; ACE fast-rope functions are usually fine server-side,
-// but if your modpack requires locality, we remoteExec them to the vehicle locality too.
-[] spawn {
-  sleep 2;
-
-  private _lz = getMarkerPos "mrk_lz";
-
-  // Rope only assault helos (not CAS)
-  private _targets = [
-    missionNamespace getVariable ["heli_assault_2", objNull],
-    missionNamespace getVariable ["heli_assault_3", objNull]
-  ] select { !isNull _x };
-
-  {
-    private _veh = _x;
-    if (isNull _veh || !alive _veh) then { continue; };
-
+    // Wait until helicopter has landed (on ground or very close)
     waitUntil {
       sleep 0.5;
-      !alive _veh || ((_veh distance2D _lz) < _ropeTriggerRadius)
+      !alive _heli || isTouchingGround _heli || ((getPosATL _heli) select 2) < 2
     };
-    if (!alive _veh) then { continue; };
+    if (!alive _heli) exitWith {};
 
-    // Equip FRIES (run on vehicle locality if present)
-    if (!isNil "ace_fastroping_fnc_equipFRIES") then {
-      [_veh] remoteExec ["ace_fastroping_fnc_equipFRIES", _veh];
-      sleep 0.5;
-    };
+    diag_log format ["[ASSAULT] Assault helo idx=%1 has landed at %2", _idx, getPosATL _heli];
 
-    // Fast rope (run on vehicle locality if present)
-    if (!isNil "ace_fastroping_fnc_fastRope") then {
-      [_veh] remoteExec ["ace_fastroping_fnc_fastRope", _veh];
-    } else {
-      { unassignVehicle _x; moveOut _x; } forEach (assignedCargo _veh);
-    };
+    // Brief pause before disembark
+    sleep 2;
 
-    sleep _ropeStagger;
+    // Order all cargo to disembark
+    {
+      unassignVehicle _x;
+      [_x] orderGetIn false;
+      _x action ["GetOut", _heli];
+    } forEach (crew _heli select { _heli getCargoIndex _x >= 0 });
 
-  } forEach _targets;
+    diag_log format ["[ASSAULT] Assault helo idx=%1 troops disembarked", _idx];
+  };
 };

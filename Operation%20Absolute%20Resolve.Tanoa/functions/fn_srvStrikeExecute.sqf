@@ -4,9 +4,10 @@
 // Server function: Executes a strike at the specified position
 // - AIR: 8x Mk82 bombs over 80m radius
 // - NAVAL: 16x 155mm shells over 120m radius
+// - DE: Directed energy weapon, 50m radius non-lethal incapacitation
 //
 // Parameters:
-//   _type - STRING: Strike type ("AIR" or "NAVAL")
+//   _type - STRING: Strike type ("AIR", "NAVAL", or "DE")
 //   _pos - ARRAY: Target position [x,y,z]
 //
 // Called from: strikeScheduler.sqf
@@ -33,5 +34,9 @@ switch (_type) do {
   case "NAVAL": {
     // More shells, wider spread, faster rate
     ["Sh_155mm_AMOS", 16, 120, 0.25] call _doExplosions;
+  };
+  case "DE": {
+    // Directed energy weapon - non-lethal incapacitation
+    [_pos, 50] call fnc_deStrikeExecute;
   };
 };

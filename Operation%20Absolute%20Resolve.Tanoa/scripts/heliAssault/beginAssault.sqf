@@ -51,7 +51,7 @@ private _lzCenter = getMarkerPos "mrk_lz";
 // Landing configuration
 private _approachHeight = 100;           // Altitude for approach to LZ (meters AGL)
 private _approachSpeed = 150;            // Speed limit during approach (km/h)
-private _staggerDelay = 3;               // Seconds between each assault helicopter departure
+private _staggerDelay = 1.5;               // Seconds between each assault helicopter departure
 
 //------------------------------------------------------------------------------
 // Diagnostic logging

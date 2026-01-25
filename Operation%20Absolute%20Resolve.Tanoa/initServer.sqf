@@ -75,6 +75,14 @@ publicVariable "fnc_srvStrikeExecute";
 [] execVM "scripts\hvt.sqf";             // HVT setup and arrest handler
 
 //------------------------------------------------------------------------------
+// Load Directed Energy Weapon system
+//------------------------------------------------------------------------------
+call compileFinal preprocessFileLineNumbers "scripts\directedEnergy\deWeapon.sqf";
+publicVariable "fnc_deApplyEffect";
+publicVariable "fnc_deWeaponFire";
+publicVariable "fnc_deStrikeExecute";
+
+//------------------------------------------------------------------------------
 // PHASE 1: Server function - Trip power (blackout)
 //------------------------------------------------------------------------------
 fnc_srvTripPower = {

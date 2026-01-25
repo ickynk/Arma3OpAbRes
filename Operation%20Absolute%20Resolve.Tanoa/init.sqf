@@ -14,3 +14,4 @@ fnc_phaseAdvance      = compileFinal preprocessFileLineNumbers "functions\fn_pha
 fnc_strikeUI          = compileFinal preprocessFileLineNumbers "functions\fn_strikeUI.sqf";
 fnc_srvStrikePlan     = compileFinal preprocessFileLineNumbers "functions\fn_srvStrikePlan.sqf";
 fnc_srvStrikeExecute  = compileFinal preprocessFileLineNumbers "functions\fn_srvStrikeExecute.sqf";
+fnc_deWeaponUI        = compileFinal preprocessFileLineNumbers "functions\fn_deWeaponUI.sqf";

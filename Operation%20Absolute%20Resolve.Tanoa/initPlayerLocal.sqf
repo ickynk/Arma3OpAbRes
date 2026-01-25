@@ -105,6 +105,14 @@ fnc_addPlayerActions = {
       && !(missionNamespace getVariable ['assaultBegun',false])
     "
   ];
+
+  // PHASE 3: Directed Energy Weapon (non-lethal incapacitation)
+  _unit addAction [
+    "<t color='#aa66ff'>Deploy Directed Energy Weapon</t>",
+    { [] call fnc_deWeaponUI; },
+    nil, 1.5, true, true, "",
+    "(missionNamespace getVariable ['missionPhase',1]) == 3"
+  ];
 };
 
 //------------------------------------------------------------------------------

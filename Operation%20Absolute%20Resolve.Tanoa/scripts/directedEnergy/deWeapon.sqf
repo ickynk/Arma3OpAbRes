@@ -27,6 +27,7 @@ if (!isServer) exitWith {};
 DE_EFFECT_DURATION = 60;           // How long the effect lasts (seconds)
 DE_SKILL_LEVEL = 0.01;             // AI skill level when affected (near-zero)
 DE_DEFAULT_RADIUS = 50;            // Default effect radius (meters)
+DE_EFFECTIVENESS = 0.6;            // 60% chance to affect each target
 
 // Animations for incapacitated state (will cycle through these)
 DE_INCAP_ANIMATIONS = [
@@ -41,9 +42,18 @@ DE_INCAP_ANIMATIONS = [
 fnc_deApplyEffect = {
   params ["_unit", ["_duration", DE_EFFECT_DURATION]];
 
-  if (isNull _unit) exitWith {};
-  if (!alive _unit) exitWith {};
-  if (_unit getVariable ["de_affected", false]) exitWith {}; // Already affected
+  if (isNull _unit) exitWith {false};
+  if (!alive _unit) exitWith {false};
+  if (_unit getVariable ["de_affected", false]) exitWith {false}; // Already affected
+
+  // BluFor units are immune (friendly fire protection)
+  if (side _unit == west) exitWith {false};
+
+  // 60% effectiveness rate - some targets resist the effect
+  if (random 1 > DE_EFFECTIVENESS) exitWith {
+    diag_log format ["[DE_WEAPON] %1 resisted the effect", _unit];
+    false
+  };
 
   // Mark unit as affected
   _unit setVariable ["de_affected", true, true];
@@ -114,6 +124,8 @@ fnc_deApplyEffect = {
 
     diag_log format ["[DE_WEAPON] Effect worn off for %1", _u];
   };
+
+  true  // Return success
 };
 
 //------------------------------------------------------------------------------
@@ -140,23 +152,25 @@ fnc_deWeaponFire = {
     playSound3D ["A3\Sounds_F\sfx\alarmCar.wss", objNull, false, _pos, 2, 0.3, 500];
   }] remoteExec ["call", 0];
 
-  // Find all enemy units in radius
-  private _affectedUnits = [];
+  // Find all OpFor units in radius (only targets east side - enemy forces)
+  private _targetUnits = [];
   {
-    if (alive _x && {side _x != west} && {_x distance _centerPos <= _radius}) then {
-      _affectedUnits pushBack _x;
+    if (alive _x && {side _x == east} && {_x distance _centerPos <= _radius}) then {
+      _targetUnits pushBack _x;
     };
   } forEach allUnits;
 
-  // Apply effect to all targets
+  // Apply effect to targets (60% effectiveness rate applied in fnc_deApplyEffect)
+  private _affectedCount = 0;
   {
-    [_x, _duration] call fnc_deApplyEffect;
+    private _wasAffected = [_x, _duration] call fnc_deApplyEffect;
+    if (_wasAffected) then { _affectedCount = _affectedCount + 1; };
     sleep 0.1; // Slight stagger to prevent simultaneous processing
-  } forEach _affectedUnits;
+  } forEach _targetUnits;
 
   // Return count of affected units
-  diag_log format ["[DE_WEAPON] Affected %1 units", count _affectedUnits];
-  count _affectedUnits
+  diag_log format ["[DE_WEAPON] Targeted %1 units, affected %2 (60%% effectiveness)", count _targetUnits, _affectedCount];
+  _affectedCount
 };
 
 //------------------------------------------------------------------------------

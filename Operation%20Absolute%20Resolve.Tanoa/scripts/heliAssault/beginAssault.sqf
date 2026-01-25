@@ -51,6 +51,7 @@ private _lzCenter = getMarkerPos "mrk_lz";
 // Landing configuration
 private _approachHeight = 100;           // Altitude for approach to LZ (meters AGL)
 private _approachSpeed = 150;            // Speed limit during approach (km/h)
+private _staggerDelay = 3;               // Seconds between each assault helicopter departure
 
 //------------------------------------------------------------------------------
 // Diagnostic logging
@@ -116,8 +117,8 @@ private _wakeForPlayback = {
   _grp setCombatMode "RED";
   _grp setSpeedMode "FULL";
 
-  _veh flyInHeight 120;
-  _veh limitSpeed 120;
+  _veh flyInHeight _approachHeight;
+  _veh limitSpeed _approachSpeed;
 
   private _wp = _grp addWaypoint [_lzCenter, 0];
   _wp setWaypointType "SAD";
@@ -131,8 +132,14 @@ private _wakeForPlayback = {
 
 //------------------------------------------------------------------------------
 // Phase 2: Launch assault helicopters to LZ (waypoint-based landing)
+// Staggered departure to avoid collisions
 //------------------------------------------------------------------------------
 for "_i" from 0 to ((count _assaultHelis) - 1) do {
+
+  // Stagger departure - each helicopter leaves a few seconds after the previous
+  if (_i > 0) then {
+    sleep _staggerDelay;
+  };
 
   private _veh = _assaultHelis select _i;
   private _offset = _landingOffsets select _i;

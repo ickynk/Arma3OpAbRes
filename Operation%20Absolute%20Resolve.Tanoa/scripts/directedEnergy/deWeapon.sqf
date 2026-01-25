@@ -39,7 +39,7 @@ DE_INCAP_ANIMATIONS = [
 //------------------------------------------------------------------------------
 // Function: Apply directed energy effect to a single unit
 //------------------------------------------------------------------------------
-fnc_deApplyEffect = {
+missionNamespace setVariable ["fnc_deApplyEffect", {
   params ["_unit", ["_duration", DE_EFFECT_DURATION]];
 
   if (isNull _unit) exitWith {false};
@@ -126,12 +126,12 @@ fnc_deApplyEffect = {
   };
 
   true  // Return success
-};
+}];
 
 //------------------------------------------------------------------------------
 // Function: Fire directed energy weapon at area
 //------------------------------------------------------------------------------
-fnc_deWeaponFire = {
+missionNamespace setVariable ["fnc_deWeaponFire", {
   params ["_centerPos", ["_radius", DE_DEFAULT_RADIUS], ["_duration", DE_EFFECT_DURATION]];
 
   diag_log format ["[DE_WEAPON] Firing at %1 with radius %2m", _centerPos, _radius];
@@ -171,12 +171,12 @@ fnc_deWeaponFire = {
   // Return count of affected units
   diag_log format ["[DE_WEAPON] Targeted %1 units, affected %2 (60%% effectiveness)", count _targetUnits, _affectedCount];
   _affectedCount
-};
+}];
 
 //------------------------------------------------------------------------------
 // Function: Create directed energy strike (similar to air/naval strike system)
 //------------------------------------------------------------------------------
-fnc_deStrikeExecute = {
+missionNamespace setVariable ["fnc_deStrikeExecute", {
   params ["_pos", ["_radius", DE_DEFAULT_RADIUS]];
 
   if (!isServer) exitWith {};
@@ -206,6 +206,6 @@ fnc_deStrikeExecute = {
   };
 
   deleteVehicle _light;
-};
+}];
 
 diag_log "[DE_WEAPON] Directed Energy Weapon system loaded";

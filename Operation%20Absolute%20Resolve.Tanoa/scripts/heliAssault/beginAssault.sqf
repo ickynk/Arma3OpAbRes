@@ -38,6 +38,13 @@ private _landingOffsets = [
   [-50, 0]      // Third helicopter lands 50m west
 ];
 
+// Flight altitude offsets for each helicopter (prevents mid-flight collision)
+// Added to _approachHeight to give each helicopter a different cruise altitude
+private _altitudeOffsets = [0, 30, 60];  // First at 100m, second at 130m, third at 160m
+
+// CAS altitude offsets (higher than assault helis to stay out of their way)
+private _casAltitudeOffsets = [80, 110];  // First at 180m, second at 210m
+
 // Optional CAS helicopters (AI-controlled, NOT on recorded tracks)
 private _casHelis = [];
 private _heliCas1 = missionNamespace getVariable ["heli_cas_1", objNull];
@@ -97,9 +104,16 @@ private _wakeForPlayback = {
 
 //------------------------------------------------------------------------------
 // Phase 1: Launch CAS helicopters (optional, AI-controlled)
+// Staggered departure and altitude separation to prevent collisions
 //------------------------------------------------------------------------------
-{
-  private _veh = _x;
+for "_i" from 0 to ((count _casHelis) - 1) do {
+
+  // Stagger departure - each CAS helicopter leaves a few seconds after the previous
+  if (_i > 0) then {
+    sleep _staggerDelay;
+  };
+
+  private _veh = _casHelis select _i;
   if (isNull _veh) then { continue; };
 
   [_veh] call _wakeForPlayback;
@@ -117,7 +131,9 @@ private _wakeForPlayback = {
   _grp setCombatMode "RED";
   _grp setSpeedMode "FULL";
 
-  _veh flyInHeight _approachHeight;
+  // Each CAS helicopter flies at a different altitude to prevent collision
+  private _casFlightAltitude = _approachHeight + (_casAltitudeOffsets select _i);
+  _veh flyInHeight _casFlightAltitude;
   _veh limitSpeed _approachSpeed;
 
   private _wp = _grp addWaypoint [_lzCenter, 0];
@@ -127,7 +143,8 @@ private _wakeForPlayback = {
   private _cycle = _grp addWaypoint [_lzCenter, 0];
   _cycle setWaypointType "CYCLE";
 
-} forEach _casHelis;
+  diag_log format ["[ASSAULT] CAS helo idx=%1 launched at altitude %2m", _i, _casFlightAltitude];
+};
 
 
 //------------------------------------------------------------------------------
@@ -175,7 +192,9 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   _grp setCombatMode "BLUE";
   _grp setSpeedMode "FULL";
 
-  _veh flyInHeight _approachHeight;
+  // Each helicopter flies at a different altitude to prevent mid-flight collision
+  private _flightAltitude = _approachHeight + (_altitudeOffsets select _i);
+  _veh flyInHeight _flightAltitude;
   _veh limitSpeed _approachSpeed;
 
   // Waypoint 1: MOVE to landing position
@@ -194,8 +213,8 @@ for "_i" from 0 to ((count _assaultHelis) - 1) do {
   private _wp3 = _grp addWaypoint [_landingPos, 0];
   _wp3 setWaypointType "HOLD";
 
-  diag_log format ["[ASSAULT] Assault helo idx=%1 assigned landing at %2 (offset %3)",
-    _i, _landingPos, _offset
+  diag_log format ["[ASSAULT] Assault helo idx=%1 assigned landing at %2 (offset %3, altitude %4m)",
+    _i, _landingPos, _offset, _flightAltitude
   ];
 
   // Spawn monitoring thread for this helicopter to handle landing and disembark

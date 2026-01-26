@@ -184,28 +184,33 @@ missionNamespace setVariable ["fnc_deStrikeExecute", {
   // Broadcast notification
   ["Directed Energy Weapon Deployed"] remoteExec ["hint", 0];
 
-  // Visual warning effect (energy buildup)
-  private _light = "#lightpoint" createVehicle _pos;
-  _light setLightBrightness 1;
-  _light setLightColor [0.5, 0.5, 1];
-  _light setLightAmbient [0.2, 0.2, 0.4];
+  // Spawn visual effects and weapon fire (requires scheduled environment for sleep)
+  [_pos, _radius] spawn {
+    params ["_pos", "_radius"];
 
-  // Buildup phase
-  for "_i" from 1 to 10 do {
-    _light setLightBrightness (_i / 5);
-    sleep 0.2;
+    // Visual warning effect (energy buildup)
+    private _light = "#lightpoint" createVehicle _pos;
+    _light setLightBrightness 1;
+    _light setLightColor [0.5, 0.5, 1];
+    _light setLightAmbient [0.2, 0.2, 0.4];
+
+    // Buildup phase
+    for "_i" from 1 to 10 do {
+      _light setLightBrightness (_i / 5);
+      sleep 0.2;
+    };
+
+    // Fire the weapon
+    [_pos, _radius] call fnc_deWeaponFire;
+
+    // Dissipate effect
+    for "_i" from 10 to 1 step -1 do {
+      _light setLightBrightness (_i / 5);
+      sleep 0.1;
+    };
+
+    deleteVehicle _light;
   };
-
-  // Fire the weapon
-  [_pos, _radius] call fnc_deWeaponFire;
-
-  // Dissipate effect
-  for "_i" from 10 to 1 step -1 do {
-    _light setLightBrightness (_i / 5);
-    sleep 0.1;
-  };
-
-  deleteVehicle _light;
 }];
 
 diag_log "[DE_WEAPON] Directed Energy Weapon system loaded";
